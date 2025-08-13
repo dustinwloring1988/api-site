@@ -79,39 +79,166 @@ A modern, production-ready AI API platform built on llama.cpp with OpenAI compat
 
 ### Database Setup
 
-Run these SQL scripts against your Supabase database:
+Run these SQL scripts against your Supabase database. The following schema provides a comprehensive setup for managing users, API keys, models, usage, billing, and system status.
+
+> **Note:** This schema assumes you are using Supabase for authentication. The `profiles` table is designed to link to Supabase's built-in `auth.users` table.
 
 ```sql
--- Create users table
-CREATE TABLE users (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  email text UNIQUE NOT NULL,
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
+--
+-- TBL: profiles
+-- Description: Stores public user data and links to Supabase auth.
+--
+CREATE TABLE profiles (
+  id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  updated_at timestamptz,
+  stripe_customer_id text UNIQUE,
+  credits numeric(10, 4) DEFAULT 0.00 CHECK (credits >= 0)
 );
 
--- Create API keys table  
+-- RLS for profiles
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view their own profile" ON profiles FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Users can update their own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
+
+--
+-- TBL: models
+-- Description: Stores information about available AI models and their pricing.
+--
+CREATE TABLE models (
+  id bigserial PRIMARY KEY,
+  name text NOT NULL,
+  internal_name text NOT NULL UNIQUE,
+  input_price_per_million_tokens integer NOT NULL, -- Price in cents
+  output_price_per_million_tokens integer NOT NULL, -- Price in cents
+  active boolean DEFAULT true,
+  created_at timestamptz DEFAULT now()
+);
+
+-- RLS for models (allow public read access)
+ALTER TABLE models ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read access to models" ON models FOR SELECT USING (true);
+
+
+--
+-- TBL: api_keys
+-- Description: Manages user-generated API keys for accessing the service.
+--
 CREATE TABLE api_keys (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES users(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   name text NOT NULL,
-  key_hash text NOT NULL,
-  created_at timestamptz DEFAULT now(),
-  last_used_at timestamptz
+  key_prefix text NOT NULL UNIQUE, -- e.g., "sk_live_..."
+  key_hash text NOT NULL UNIQUE, -- Hashed key for security
+  revoked boolean DEFAULT false,
+  expires_at timestamptz,
+  last_used_at timestamptz,
+  created_at timestamptz DEFAULT now()
 );
 
--- Enable RLS
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+-- RLS for api_keys
 ALTER TABLE api_keys ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own API keys" ON api_keys FOR ALL USING (auth.uid() = user_id);
 
--- Create policies
-CREATE POLICY "Users can read own data" ON users
-  FOR SELECT TO authenticated 
-  USING (auth.uid() = id);
+--
+-- TBL: usage_logs
+-- Description: Logs each API request for billing and analytics.
+--
+CREATE TABLE usage_logs (
+  id bigserial PRIMARY KEY,
+  api_key_id uuid NOT NULL REFERENCES api_keys(id),
+  model_id bigint NOT NULL REFERENCES models(id),
+  user_id uuid NOT NULL REFERENCES auth.users(id),
+  prompt_tokens integer NOT NULL,
+  completion_tokens integer NOT NULL,
+  cost numeric(10, 6) NOT NULL, -- Cost for this specific request
+  created_at timestamptz DEFAULT now()
+);
 
-CREATE POLICY "Users can manage own API keys" ON api_keys
-  FOR ALL TO authenticated 
-  USING (user_id = auth.uid());
+-- RLS for usage_logs
+ALTER TABLE usage_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view their own usage logs" ON usage_logs FOR SELECT USING (auth.uid() = user_id);
+
+--
+-- TBL: subscriptions
+-- Description: Tracks user subscriptions, linked to Stripe.
+--
+CREATE TYPE subscription_status AS ENUM ('active', 'trialing', 'past_due', 'canceled', 'unpaid');
+CREATE TABLE subscriptions (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    stripe_subscription_id text UNIQUE,
+    status subscription_status NOT NULL,
+    current_period_start timestamptz NOT NULL,
+    current_period_end timestamptz NOT NULL,
+    cancel_at_period_end boolean DEFAULT false,
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz
+);
+
+-- RLS for subscriptions
+ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view their own subscriptions" ON subscriptions FOR SELECT USING (auth.uid() = user_id);
+
+--
+-- TBL: services
+-- Description: Lists monitored services for the system status page.
+--
+CREATE TYPE service_status AS ENUM ('operational', 'degraded_performance', 'partial_outage', 'major_outage');
+CREATE TABLE services (
+  id serial PRIMARY KEY,
+  name text NOT NULL,
+  description text,
+  status service_status DEFAULT 'operational',
+  last_updated timestamptz DEFAULT now()
+);
+
+-- RLS for services (allow public read access)
+ALTER TABLE services ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read access to services" ON services FOR SELECT USING (true);
+
+--
+-- TBL: incidents
+-- Description: Logs system-wide incidents for the status page.
+--
+CREATE TYPE incident_severity AS ENUM ('critical', 'high', 'medium', 'low');
+CREATE TYPE incident_status AS ENUM ('investigating', 'identified', 'monitoring', 'resolved');
+CREATE TABLE incidents (
+    id bigserial PRIMARY KEY,
+    title text NOT NULL,
+    status incident_status DEFAULT 'investigating',
+    severity incident_severity DEFAULT 'medium',
+    created_at timestamptz DEFAULT now(),
+    resolved_at timestamptz
+);
+
+-- RLS for incidents (allow public read access)
+ALTER TABLE incidents ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read access to incidents" ON incidents FOR SELECT USING (true);
+
+
+--
+-- TBL: incident_updates
+-- Description: Provides updates for a specific incident.
+--
+CREATE TABLE incident_updates (
+    id bigserial PRIMARY KEY,
+    incident_id bigint NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+    description text NOT NULL,
+    status_at_update incident_status NOT NULL,
+    created_at timestamptz DEFAULT now()
+);
+
+-- RLS for incident_updates (allow public read access)
+ALTER TABLE incident_updates ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read access to incident updates" ON incident_updates FOR SELECT USING (true);
+
+--
+-- Seed initial data for models
+--
+INSERT INTO models (name, internal_name, input_price_per_million_tokens, output_price_per_million_tokens) VALUES
+('gpt-oss-20B', 'gpt-fast', 25, 50), -- $0.25 and $0.50
+('gpt-oss-120B', 'gpt-full', 50, 100), -- $0.50 and $1.00
+('snowflake-arctic-embed2', 'embed', 5, 0); -- $0.05 and N/A
 ```
 
 ## 📖 API Documentation
