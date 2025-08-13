@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Brain, Menu, X, LogOut, Settings, CreditCard } from 'lucide-react'
+import { Brain, Menu, X, LogOut, Settings } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { Button } from './ui/Button'
 import { SignInModal } from './modals/SignInModal'
@@ -84,14 +84,6 @@ export function Header() {
                       >
                         <Settings size={16} />
                         <span>Dashboard</span>
-                      </Link>
-                      <Link
-                        to="/billing"
-                        className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        onClick={() => setIsProfileOpen(false)}
-                      >
-                        <CreditCard size={16} />
-                        <span>Billing</span>
                       </Link>
                       <button
                         onClick={() => {
