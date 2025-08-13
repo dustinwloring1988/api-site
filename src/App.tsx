@@ -1,6 +1,7 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import ScrollToTop from './components/ScrollToTop'
 import { Header } from './components/Header'
 import { Footer } from './components/Footer'
 import { Toaster } from './components/ui/Toast'
@@ -8,6 +9,7 @@ import { Landing } from './pages/Landing'
 import { Dashboard } from './pages/Dashboard'
 import { Status } from './pages/Status'
 import { Documentation } from './pages/Documentation'
+import { Pricing } from './pages/Pricing'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -31,11 +33,13 @@ function App() {
   return (
     <AuthProvider>
       <Router>
+        <ScrollToTop />
         <div className="min-h-screen bg-white flex flex-col">
           <Header />
           <main className="flex-1">
             <Routes>
               <Route path="/" element={<Landing />} />
+              <Route path="/pricing" element={<Pricing />} />
               <Route path="/status" element={<Status />} />
               <Route path="/docs" element={<Documentation />} />
               <Route 

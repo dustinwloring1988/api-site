@@ -18,6 +18,7 @@ export function Header() {
   const navigation = [
     { name: 'Home', href: '/', show: !user },
     { name: 'Dashboard', href: '/dashboard', show: !!user },
+    { name: 'Pricing', href: '/pricing', show: true },
     { name: 'Status', href: '/status', show: true },
     { name: 'Documentation', href: '/docs', show: true },
   ]
