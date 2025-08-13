@@ -79,7 +79,7 @@ A modern, production-ready AI API platform built on llama.cpp with OpenAI compat
 
 ### Database Setup
 
-Run the SQL scripts in the `/scripts` directory against your Supabase database:
+Run these SQL scripts against your Supabase database:
 
 ```sql
 -- Create users table
