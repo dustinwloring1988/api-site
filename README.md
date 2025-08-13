@@ -1,4 +1,8 @@
-# GPT API - High-Performance AI Inference Platform
+# GPT API
+
+![cover](https://github.com/user-attachments/assets/4a413e9b-4cd6-4431-8f17-59356f5f5a74)
+
+## About our High-Performance AI Inference Platform
 
 A modern, production-ready AI API platform built on llama.cpp with OpenAI compatibility, featuring advanced authentication, billing, and multi-tenant support.
 
