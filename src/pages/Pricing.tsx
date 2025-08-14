@@ -1,36 +1,33 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import { CheckCircle } from 'lucide-react'
+import { useModels } from '../hooks/useSupabaseData'
 import { Button } from '../components/ui/Button'
 
-const pricing = [
-  {
-    name: 'gpt-oss-20B',
-    model: 'gpt-fast',
-    useCase: 'General purpose',
-    input: '$0.25 / 1M tokens',
-    output: '$0.50 / 1M tokens',
-    popular: false
-  },
-  {
-    name: 'gpt-oss-120B',
-    model: 'gpt-full',
-    useCase: 'Advanced reasoning',
-    input: '$0.50 / 1M tokens',
-    output: '$1.00 / 1M tokens',
-    popular: true
-  },
-  {
-    name: 'snowflake-arctic-embed2',
-    model: 'embed',
-    useCase: 'Embeddings',
-    input: '$0.05 / 1M tokens',
-    output: 'N/A',
-    popular: false
-  }
-]
-
 export function Pricing() {
+  const { models, loading } = useModels()
+
+  const formatPrice = (priceInCents: number) => {
+    return `$${(priceInCents / 100).toFixed(2)} / 1M tokens`
+  }
+
+  const getUseCase = (internalName: string) => {
+    switch (internalName) {
+      case 'gpt-fast':
+        return 'General purpose'
+      case 'gpt-full':
+        return 'Advanced reasoning'
+      case 'embed':
+        return 'Embeddings'
+      default:
+        return 'AI Model'
+    }
+  }
+
+  const isPopular = (internalName: string) => {
+    return internalName === 'gpt-full'
+  }
+
   return (
     <div className="min-h-screen">
       <section className="py-20 bg-gray-50">
@@ -51,20 +48,43 @@ export function Pricing() {
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {pricing.map((plan, index) => (
+            {loading ? (
+              // Loading skeleton
+              [...Array(3)].map((_, index) => (
+                <div key={index} className="bg-white rounded-xl p-8 border-2 border-gray-200">
+                  <div className="animate-pulse">
+                    <div className="h-6 bg-gray-200 rounded w-32 mb-2"></div>
+                    <div className="h-4 bg-gray-200 rounded w-24 mb-1"></div>
+                    <div className="h-4 bg-gray-200 rounded w-28 mb-6"></div>
+                    <div className="space-y-4 mb-8">
+                      <div>
+                        <div className="h-3 bg-gray-200 rounded w-20 mb-1"></div>
+                        <div className="h-6 bg-gray-200 rounded w-32"></div>
+                      </div>
+                      <div>
+                        <div className="h-3 bg-gray-200 rounded w-20 mb-1"></div>
+                        <div className="h-6 bg-gray-200 rounded w-32"></div>
+                      </div>
+                    </div>
+                    <div className="h-10 bg-gray-200 rounded w-full"></div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              models.map((model, index) => (
               <motion.div
-                key={plan.name}
+                key={model.id}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
                 viewport={{ once: true }}
                 className={`relative bg-white rounded-xl p-8 border-2 transition-all hover:scale-105 ${
-                  plan.popular
+                  isPopular(model.internal_name)
                     ? 'border-blue-500 shadow-xl'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
               >
-                {plan.popular && (
+                {isPopular(model.internal_name) && (
                   <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                     <span className="bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-medium">
                       Most Popular
@@ -73,23 +93,25 @@ export function Pricing() {
                 )}
 
                 <div className="text-center">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
-                  <p className="text-gray-600 mb-1">Model: <code className="bg-gray-100 px-2 py-1 rounded">{plan.model}</code></p>
-                  <p className="text-gray-600 mb-6">{plan.useCase}</p>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">{model.name}</h3>
+                  <p className="text-gray-600 mb-1">Model: <code className="bg-gray-100 px-2 py-1 rounded">{model.internal_name}</code></p>
+                  <p className="text-gray-600 mb-6">{getUseCase(model.internal_name)}</p>
 
                   <div className="space-y-4 mb-8">
                     <div>
                       <span className="text-sm text-gray-500">Input tokens</span>
-                      <p className="text-2xl font-bold text-gray-900">{plan.input}</p>
+                      <p className="text-2xl font-bold text-gray-900">{formatPrice(model.input_price_per_million_tokens)}</p>
                     </div>
                     <div>
                       <span className="text-sm text-gray-500">Output tokens</span>
-                      <p className="text-2xl font-bold text-gray-900">{plan.output}</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {model.output_price_per_million_tokens === 0 ? 'N/A' : formatPrice(model.output_price_per_million_tokens)}
+                      </p>
                     </div>
                   </div>
 
                   <Button
-                    variant={plan.popular ? "primary" : "outline"}
+                    variant={isPopular(model.internal_name) ? "primary" : "outline"}
                     size="lg"
                     className="w-full"
                   >
@@ -98,6 +120,7 @@ export function Pricing() {
                 </div>
               </motion.div>
             ))}
+            )}
           </div>
 
           <motion.div

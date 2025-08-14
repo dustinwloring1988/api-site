@@ -2,11 +2,15 @@ import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Key, BarChart3, CreditCard, Settings, Plus, Copy, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useApiKeys, useUsageStats, useProfile } from '../hooks/useSupabaseData'
 import { Button } from '../components/ui/Button'
 import { formatCurrency, formatNumber } from '../lib/utils'
 
 export function Dashboard() {
   const { user } = useAuth()
+  const { apiKeys, loading: apiKeysLoading } = useApiKeys()
+  const { stats, loading: statsLoading } = useUsageStats()
+  const { profile, loading: profileLoading } = useProfile()
   const [activeTab, setActiveTab] = useState('overview')
   const [showApiKey, setShowApiKey] = useState(false)
 
@@ -17,28 +21,8 @@ export function Dashboard() {
     { id: 'settings', name: 'Settings', icon: Settings },
   ]
 
-  const mockApiKeys = [
-    {
-      id: '1',
-      name: 'Production Key',
-      key: 'gpt_live_1234567890abcdef',
-      created: '2025-01-15',
-      lastUsed: '2025-01-20',
-    },
-    {
-      id: '2', 
-      name: 'Development Key',
-      key: 'gpt_test_0987654321fedcba',
-      created: '2025-01-10',
-      lastUsed: '2025-01-19',
-    }
-  ]
-
-  const mockUsageData = {
-    tokensThisMonth: 2456789,
-    costThisMonth: 12.28,
-    requestsThisMonth: 1234,
-    modelsUsed: ['gpt-fast', 'gpt-full', 'embed']
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString()
   }
 
   return (
@@ -97,59 +81,87 @@ export function Dashboard() {
                 {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <div className="bg-white rounded-xl p-6 border border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-gray-600">Tokens Used</p>
-                        <p className="text-2xl font-bold text-gray-900">
-                          {formatNumber(mockUsageData.tokensThisMonth)}
-                        </p>
+                    {statsLoading ? (
+                      <div className="animate-pulse">
+                        <div className="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+                        <div className="h-8 bg-gray-200 rounded w-16"></div>
                       </div>
-                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <BarChart3 className="h-6 w-6 text-blue-600" />
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-gray-600">Tokens Used</p>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {formatNumber(stats.tokensThisMonth)}
+                          </p>
+                        </div>
+                        <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                          <BarChart3 className="h-6 w-6 text-blue-600" />
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   <div className="bg-white rounded-xl p-6 border border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-gray-600">Cost This Month</p>
-                        <p className="text-2xl font-bold text-gray-900">
-                          {formatCurrency(mockUsageData.costThisMonth)}
-                        </p>
+                    {statsLoading ? (
+                      <div className="animate-pulse">
+                        <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+                        <div className="h-8 bg-gray-200 rounded w-20"></div>
                       </div>
-                      <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                        <CreditCard className="h-6 w-6 text-green-600" />
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-gray-600">Cost This Month</p>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {formatCurrency(stats.costThisMonth)}
+                          </p>
+                        </div>
+                        <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                          <CreditCard className="h-6 w-6 text-green-600" />
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   <div className="bg-white rounded-xl p-6 border border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-gray-600">API Requests</p>
-                        <p className="text-2xl font-bold text-gray-900">
-                          {formatNumber(mockUsageData.requestsThisMonth)}
-                        </p>
+                    {statsLoading ? (
+                      <div className="animate-pulse">
+                        <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+                        <div className="h-8 bg-gray-200 rounded w-16"></div>
                       </div>
-                      <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                        <Key className="h-6 w-6 text-purple-600" />
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-gray-600">API Requests</p>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {formatNumber(stats.requestsThisMonth)}
+                          </p>
+                        </div>
+                        <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                          <Key className="h-6 w-6 text-purple-600" />
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   <div className="bg-white rounded-xl p-6 border border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-gray-600">Models Used</p>
-                        <p className="text-2xl font-bold text-gray-900">
-                          {mockUsageData.modelsUsed.length}
-                        </p>
+                    {statsLoading ? (
+                      <div className="animate-pulse">
+                        <div className="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+                        <div className="h-8 bg-gray-200 rounded w-8"></div>
                       </div>
-                      <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                        <Settings className="h-6 w-6 text-orange-600" />
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-gray-600">Models Used</p>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {stats.modelsUsed.length}
+                          </p>
+                        </div>
+                        <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                          <Settings className="h-6 w-6 text-orange-600" />
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
 
@@ -177,14 +189,38 @@ export function Dashboard() {
                 </div>
 
                 <div className="space-y-4">
-                  {mockApiKeys.map((apiKey) => (
+                  {apiKeysLoading ? (
+                    <div className="animate-pulse space-y-4">
+                      {[...Array(2)].map((_, i) => (
+                        <div key={i} className="bg-white rounded-xl p-6 border border-gray-200">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="h-5 bg-gray-200 rounded w-32 mb-2"></div>
+                              <div className="h-4 bg-gray-200 rounded w-64 mb-2"></div>
+                              <div className="h-3 bg-gray-200 rounded w-48"></div>
+                            </div>
+                            <div className="flex space-x-2">
+                              <div className="h-8 bg-gray-200 rounded w-12"></div>
+                              <div className="h-8 bg-gray-200 rounded w-16"></div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : apiKeys.length === 0 ? (
+                    <div className="bg-white rounded-xl p-6 border border-gray-200 text-center">
+                      <p className="text-gray-500 mb-4">No API keys found</p>
+                      <Button variant="primary">Create Your First API Key</Button>
+                    </div>
+                  ) : (
+                    apiKeys.map((apiKey) => (
                     <div key={apiKey.id} className="bg-white rounded-xl p-6 border border-gray-200">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <h4 className="text-lg font-medium text-gray-900">{apiKey.name}</h4>
                           <div className="flex items-center space-x-2 mt-2">
                             <code className="bg-gray-100 px-3 py-1 rounded text-sm font-mono">
-                              {showApiKey ? apiKey.key : '•'.repeat(32)}
+                              {showApiKey ? apiKey.key_prefix : '•'.repeat(32)}
                             </code>
                             <button
                               onClick={() => setShowApiKey(!showApiKey)}
@@ -197,8 +233,8 @@ export function Dashboard() {
                             </button>
                           </div>
                           <div className="flex space-x-4 mt-2 text-sm text-gray-600">
-                            <span>Created: {apiKey.created}</span>
-                            <span>Last used: {apiKey.lastUsed}</span>
+                            <span>Created: {formatDate(apiKey.created_at)}</span>
+                            <span>Last used: {apiKey.last_used_at ? formatDate(apiKey.last_used_at) : 'Never'}</span>
                           </div>
                         </div>
                         <div className="flex space-x-2">
@@ -210,6 +246,7 @@ export function Dashboard() {
                       </div>
                     </div>
                   ))}
+                  )}
                 </div>
               </div>
             )}
@@ -227,15 +264,21 @@ export function Dashboard() {
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600">Tokens used this month</span>
-                        <span className="font-semibold">{formatNumber(mockUsageData.tokensThisMonth)}</span>
+                        <span className="font-semibold">
+                          {statsLoading ? '...' : formatNumber(stats.tokensThisMonth)}
+                        </span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600">Current bill</span>
-                        <span className="font-semibold">{formatCurrency(mockUsageData.costThisMonth)}</span>
+                        <span className="font-semibold">
+                          {statsLoading ? '...' : formatCurrency(stats.costThisMonth)}
+                        </span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600">Free tier remaining</span>
-                        <span className="font-semibold text-green-600">543K tokens</span>
+                        <span className="font-semibold text-green-600">
+                          {profileLoading ? '...' : `${formatNumber(Math.max(0, 1000000 - stats.tokensThisMonth))} tokens`}
+                        </span>
                       </div>
                     </div>
                   </div>
