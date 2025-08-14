@@ -2,13 +2,19 @@ import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Key, BarChart3, CreditCard, Settings, Plus, Copy, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useSupabaseData } from '../hooks/useSupabaseData'
 import { Button } from '../components/ui/Button'
 import { formatCurrency, formatNumber } from '../lib/utils'
+import { useToast } from '../hooks/useToast'
 
 export function Dashboard() {
   const { user } = useAuth()
+  const { apiKeys, usageData, models, profile, loading, error, createApiKey, deleteApiKey } = useSupabaseData()
+  const { toast } = useToast()
   const [activeTab, setActiveTab] = useState('overview')
   const [showApiKey, setShowApiKey] = useState(false)
+  const [isCreatingKey, setIsCreatingKey] = useState(false)
+  const [newKeyName, setNewKeyName] = useState('')
 
   const tabs = [
     { id: 'overview', name: 'Overview', icon: BarChart3 },
@@ -17,28 +23,64 @@ export function Dashboard() {
     { id: 'settings', name: 'Settings', icon: Settings },
   ]
 
-  const mockApiKeys = [
-    {
-      id: '1',
-      name: 'Production Key',
-      key: 'gpt_live_1234567890abcdef',
-      created: '2025-01-15',
-      lastUsed: '2025-01-20',
-    },
-    {
-      id: '2', 
-      name: 'Development Key',
-      key: 'gpt_test_0987654321fedcba',
-      created: '2025-01-10',
-      lastUsed: '2025-01-19',
+  const handleCreateApiKey = async () => {
+    if (!newKeyName.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please enter a name for your API key',
+        variant: 'destructive'
+      })
+      return
     }
-  ]
 
-  const mockUsageData = {
-    tokensThisMonth: 2456789,
-    costThisMonth: 12.28,
-    requestsThisMonth: 1234,
-    modelsUsed: ['gpt-fast', 'gpt-full', 'embed']
+    setIsCreatingKey(true)
+    const result = await createApiKey(newKeyName.trim())
+    
+    if (result) {
+      toast({
+        title: 'Success',
+        description: 'API key created successfully',
+        variant: 'default'
+      })
+      setNewKeyName('')
+    }
+    setIsCreatingKey(false)
+  }
+
+  const handleDeleteApiKey = async (keyId: string, keyName: string) => {
+    if (window.confirm(`Are you sure you want to delete "${keyName}"? This action cannot be undone.`)) {
+      const success = await deleteApiKey(keyId)
+      if (success) {
+        toast({
+          title: 'Success',
+          description: 'API key deleted successfully',
+          variant: 'default'
+        })
+      }
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString()
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>Retry</Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -101,7 +143,7 @@ export function Dashboard() {
                       <div>
                         <p className="text-sm font-medium text-gray-600">Tokens Used</p>
                         <p className="text-2xl font-bold text-gray-900">
-                          {formatNumber(mockUsageData.tokensThisMonth)}
+                          {formatNumber(usageData.tokensThisMonth)}
                         </p>
                       </div>
                       <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -115,7 +157,7 @@ export function Dashboard() {
                       <div>
                         <p className="text-sm font-medium text-gray-600">Cost This Month</p>
                         <p className="text-2xl font-bold text-gray-900">
-                          {formatCurrency(mockUsageData.costThisMonth)}
+                          {formatCurrency(usageData.costThisMonth)}
                         </p>
                       </div>
                       <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -129,7 +171,7 @@ export function Dashboard() {
                       <div>
                         <p className="text-sm font-medium text-gray-600">API Requests</p>
                         <p className="text-2xl font-bold text-gray-900">
-                          {formatNumber(mockUsageData.requestsThisMonth)}
+                          {formatNumber(usageData.requestsThisMonth)}
                         </p>
                       </div>
                       <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -143,7 +185,7 @@ export function Dashboard() {
                       <div>
                         <p className="text-sm font-medium text-gray-600">Models Used</p>
                         <p className="text-2xl font-bold text-gray-900">
-                          {mockUsageData.modelsUsed.length}
+                          {usageData.modelsUsed.length}
                         </p>
                       </div>
                       <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
@@ -170,21 +212,66 @@ export function Dashboard() {
                     <h3 className="text-lg font-semibold text-gray-900">API Keys</h3>
                     <p className="text-gray-600">Manage your API keys for accessing GPT API</p>
                   </div>
-                  <Button variant="primary" className="inline-flex items-center">
+                  <Button 
+                    variant="primary" 
+                    className="inline-flex items-center"
+                    onClick={() => setIsCreatingKey(true)}
+                  >
                     <Plus size={16} className="mr-2" />
                     Create New Key
                   </Button>
                 </div>
 
+                {/* Create API Key Form */}
+                {isCreatingKey && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="bg-blue-50 rounded-lg p-4 border border-blue-200 mb-4"
+                  >
+                    <h4 className="font-medium text-blue-900 mb-3">Create New API Key</h4>
+                    <div className="flex space-x-3">
+                      <input
+                        type="text"
+                        value={newKeyName}
+                        onChange={(e) => setNewKeyName(e.target.value)}
+                        placeholder="Enter key name (e.g., Production, Development)"
+                        className="flex-1 px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        onKeyPress={(e) => e.key === 'Enter' && handleCreateApiKey()}
+                      />
+                      <Button variant="primary" onClick={handleCreateApiKey}>
+                        Create
+                      </Button>
+                      <Button variant="ghost" onClick={() => {
+                        setIsCreatingKey(false)
+                        setNewKeyName('')
+                      }}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
+
                 <div className="space-y-4">
-                  {mockApiKeys.map((apiKey) => (
-                    <div key={apiKey.id} className="bg-white rounded-xl p-6 border border-gray-200">
+                  {apiKeys.length === 0 ? (
+                    <div className="bg-white rounded-xl p-8 border border-gray-200 text-center">
+                      <Key className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <h4 className="text-lg font-medium text-gray-900 mb-2">No API Keys</h4>
+                      <p className="text-gray-600 mb-4">Create your first API key to start using the GPT API</p>
+                      <Button variant="primary" onClick={() => setIsCreatingKey(true)}>
+                        <Plus size={16} className="mr-2" />
+                        Create API Key
+                      </Button>
+                    </div>
+                  ) : (
+                    apiKeys.map((apiKey) => (
+                      <div key={apiKey.id} className="bg-white rounded-xl p-6 border border-gray-200">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <h4 className="text-lg font-medium text-gray-900">{apiKey.name}</h4>
                           <div className="flex items-center space-x-2 mt-2">
                             <code className="bg-gray-100 px-3 py-1 rounded text-sm font-mono">
-                              {showApiKey ? apiKey.key : '•'.repeat(32)}
+                              {showApiKey ? apiKey.key_prefix : '•'.repeat(32)}
                             </code>
                             <button
                               onClick={() => setShowApiKey(!showApiKey)}
@@ -192,24 +279,40 @@ export function Dashboard() {
                             >
                               {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
                             </button>
-                            <button className="p-1 text-gray-400 hover:text-gray-600">
+                            <button 
+                              onClick={() => {
+                                navigator.clipboard.writeText(apiKey.key_prefix)
+                                toast({
+                                  title: 'Copied',
+                                  description: 'API key copied to clipboard',
+                                  variant: 'default'
+                                })
+                              }}
+                              className="p-1 text-gray-400 hover:text-gray-600"
+                            >
                               <Copy size={16} />
                             </button>
                           </div>
                           <div className="flex space-x-4 mt-2 text-sm text-gray-600">
-                            <span>Created: {apiKey.created}</span>
-                            <span>Last used: {apiKey.lastUsed}</span>
+                            <span>Created: {formatDate(apiKey.created_at)}</span>
+                            <span>Last used: {apiKey.last_used_at ? formatDate(apiKey.last_used_at) : 'Never'}</span>
                           </div>
                         </div>
                         <div className="flex space-x-2">
                           <Button variant="outline" size="sm">Edit</Button>
-                          <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-red-600 hover:text-red-700"
+                            onClick={() => handleDeleteApiKey(apiKey.id, apiKey.name)}
+                          >
                             Delete
                           </Button>
                         </div>
                       </div>
                     </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -227,15 +330,17 @@ export function Dashboard() {
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600">Tokens used this month</span>
-                        <span className="font-semibold">{formatNumber(mockUsageData.tokensThisMonth)}</span>
+                        <span className="font-semibold">{formatNumber(usageData.tokensThisMonth)}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600">Current bill</span>
-                        <span className="font-semibold">{formatCurrency(mockUsageData.costThisMonth)}</span>
+                        <span className="font-semibold">{formatCurrency(usageData.costThisMonth)}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600">Free tier remaining</span>
-                        <span className="font-semibold text-green-600">543K tokens</span>
+                        <span className="font-semibold text-green-600">
+                          {formatNumber(Math.max(0, 1000000 - usageData.tokensThisMonth))} tokens
+                        </span>
                       </div>
                     </div>
                   </div>

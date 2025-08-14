@@ -1,51 +1,78 @@
 import React from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { CheckCircle, AlertTriangle, XCircle, Clock } from 'lucide-react'
+import { supabase } from '../lib/supabase'
+
+interface Service {
+  id: number
+  name: string
+  description: string | null
+  status: 'operational' | 'degraded_performance' | 'partial_outage' | 'major_outage'
+  uptime: number
+  last_updated: string
+}
+
+interface Incident {
+  id: number
+  title: string
+  description: string | null
+  status: 'investigating' | 'identified' | 'monitoring' | 'resolved'
+  severity: 'critical' | 'high' | 'medium' | 'low'
+  created_at: string
+  updated_at: string
+  resolved_at: string | null
+}
 
 export function Status() {
-  const services = [
-    { name: 'API Gateway', status: 'operational', uptime: '99.99%' },
-    { name: 'gpt-fast (20B)', status: 'operational', uptime: '99.95%' },
-    { name: 'gpt-full (120B)', status: 'degraded', uptime: '98.2%' },
-    { name: 'embed (Arctic)', status: 'operational', uptime: '99.98%' },
-    { name: 'Authentication', status: 'operational', uptime: '100%' },
-    { name: 'Billing System', status: 'operational', uptime: '99.9%' },
-  ]
+  const [services, setServices] = useState<Service[]>([])
+  const [incidents, setIncidents] = useState<Incident[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const incidents = [
-    {
-      id: '1',
-      title: 'Increased response times for gpt-full model',
-      description: 'We are investigating reports of increased response times for the gpt-full model.',
-      status: 'investigating',
-      createdAt: '2025-01-20T14:30:00Z',
-      updatedAt: '2025-01-20T15:45:00Z'
-    },
-    {
-      id: '2',
-      title: 'Scheduled maintenance completed',
-      description: 'Scheduled maintenance on our primary data center has been completed successfully.',
-      status: 'resolved',
-      createdAt: '2025-01-19T02:00:00Z',
-      updatedAt: '2025-01-19T03:30:00Z'
-    },
-    {
-      id: '3',
-      title: 'Brief API outage resolved',
-      description: 'A brief outage affecting API requests has been resolved.',
-      status: 'resolved',
-      createdAt: '2025-01-18T10:15:00Z',
-      updatedAt: '2025-01-18T10:45:00Z'
+  useEffect(() => {
+    const fetchStatusData = async () => {
+      try {
+        setLoading(true)
+        
+        // Fetch services
+        const { data: servicesData, error: servicesError } = await supabase
+          .from('services')
+          .select('*')
+          .order('id', { ascending: true })
+
+        if (servicesError) throw servicesError
+
+        // Fetch incidents
+        const { data: incidentsData, error: incidentsError } = await supabase
+          .from('incidents')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(10)
+
+        if (incidentsError) throw incidentsError
+
+        setServices(servicesData || [])
+        setIncidents(incidentsData || [])
+      } catch (err) {
+        console.error('Error fetching status data:', err)
+        setError('Failed to load status data')
+      } finally {
+        setLoading(false)
+      }
     }
-  ]
+
+    fetchStatusData()
+  }, [])
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'operational':
         return <CheckCircle className="h-5 w-5 text-green-500" />
-      case 'degraded':
+      case 'degraded_performance':
         return <AlertTriangle className="h-5 w-5 text-yellow-500" />
-      case 'down':
+      case 'partial_outage':
+      case 'major_outage':
         return <XCircle className="h-5 w-5 text-red-500" />
       default:
         return <Clock className="h-5 w-5 text-gray-500" />
@@ -56,9 +83,10 @@ export function Status() {
     switch (status) {
       case 'operational':
         return 'text-green-600 bg-green-50'
-      case 'degraded':
+      case 'degraded_performance':
         return 'text-yellow-600 bg-yellow-50'
-      case 'down':
+      case 'partial_outage':
+      case 'major_outage':
         return 'text-red-600 bg-red-50'
       default:
         return 'text-gray-600 bg-gray-50'
@@ -84,6 +112,45 @@ export function Status() {
     return new Date(dateString).toLocaleString()
   }
 
+  const getOverallStatus = () => {
+    if (services.some(s => s.status === 'major_outage')) {
+      return { status: 'Major Outage', icon: <XCircle className="h-8 w-8 text-red-500" />, color: 'text-red-600' }
+    }
+    if (services.some(s => s.status === 'partial_outage')) {
+      return { status: 'Partial Outage', icon: <XCircle className="h-8 w-8 text-red-500" />, color: 'text-red-600' }
+    }
+    if (services.some(s => s.status === 'degraded_performance')) {
+      return { status: 'Degraded Performance', icon: <AlertTriangle className="h-8 w-8 text-yellow-500" />, color: 'text-yellow-600' }
+    }
+    return { status: 'All Systems Operational', icon: <CheckCircle className="h-8 w-8 text-green-500" />, color: 'text-green-600' }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const overallStatus = getOverallStatus()
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -100,9 +167,9 @@ export function Status() {
           {/* Overall Status */}
           <div className="bg-white rounded-xl p-6 border border-gray-200 mb-8">
             <div className="flex items-center space-x-3">
-              <CheckCircle className="h-8 w-8 text-green-500" />
+              {overallStatus.icon}
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">All Systems Operational</h2>
+                <h2 className={`text-xl font-semibold ${overallStatus.color}`}>{overallStatus.status}</h2>
                 <p className="text-gray-600">Last updated: {new Date().toLocaleString()}</p>
               </div>
             </div>
@@ -126,11 +193,14 @@ export function Status() {
                     {getStatusIcon(service.status)}
                     <div>
                       <h4 className="font-medium text-gray-900">{service.name}</h4>
-                      <p className="text-sm text-gray-600">Uptime: {service.uptime}</p>
+                      <p className="text-sm text-gray-600">
+                        {service.description && `${service.description} • `}
+                        Uptime: {service.uptime}%
+                      </p>
                     </div>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(service.status)}`}>
-                    {service.status.charAt(0).toUpperCase() + service.status.slice(1)}
+                    {service.status.replace('_', ' ').charAt(0).toUpperCase() + service.status.replace('_', ' ').slice(1)}
                   </span>
                 </motion.div>
               ))}
@@ -154,18 +224,28 @@ export function Status() {
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
                       <h4 className="font-medium text-gray-900 mb-1">{incident.title}</h4>
-                      <p className="text-gray-600 text-sm mb-2">{incident.description}</p>
+                      {incident.description && (
+                        <p className="text-gray-600 text-sm mb-2">{incident.description}</p>
+                      )}
                     </div>
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${getIncidentStatusColor(incident.status)}`}>
                       {incident.status.charAt(0).toUpperCase() + incident.status.slice(1)}
                     </span>
                   </div>
                   <div className="flex space-x-4 text-xs text-gray-500">
-                    <span>Created: {formatDate(incident.createdAt)}</span>
-                    <span>Updated: {formatDate(incident.updatedAt)}</span>
+                    <span>Created: {formatDate(incident.created_at)}</span>
+                    <span>Updated: {formatDate(incident.updated_at)}</span>
+                    {incident.resolved_at && (
+                      <span>Resolved: {formatDate(incident.resolved_at)}</span>
+                    )}
                   </div>
                 </motion.div>
               ))}
+              {incidents.length === 0 && (
+                <div className="p-6 text-center text-gray-500">
+                  <p>No recent incidents to display</p>
+                </div>
+              )}
             </div>
           </div>
 
