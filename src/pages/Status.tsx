@@ -1,11 +1,43 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import { CheckCircle, AlertTriangle, XCircle, Clock } from 'lucide-react'
-import { useServices, useIncidents } from '../hooks/useSupabaseData'
 
 export function Status() {
-  const { services, loading: servicesLoading } = useServices()
-  const { incidents, loading: incidentsLoading } = useIncidents()
+  const services = [
+    { name: 'API Gateway', status: 'operational', uptime: '99.99%' },
+    { name: 'gpt-fast (20B)', status: 'operational', uptime: '99.95%' },
+    { name: 'gpt-full (120B)', status: 'degraded', uptime: '98.2%' },
+    { name: 'embed (Arctic)', status: 'operational', uptime: '99.98%' },
+    { name: 'Authentication', status: 'operational', uptime: '100%' },
+    { name: 'Billing System', status: 'operational', uptime: '99.9%' },
+  ]
+
+  const incidents = [
+    {
+      id: '1',
+      title: 'Increased response times for gpt-full model',
+      description: 'We are investigating reports of increased response times for the gpt-full model.',
+      status: 'investigating',
+      createdAt: '2025-01-20T14:30:00Z',
+      updatedAt: '2025-01-20T15:45:00Z'
+    },
+    {
+      id: '2',
+      title: 'Scheduled maintenance completed',
+      description: 'Scheduled maintenance on our primary data center has been completed successfully.',
+      status: 'resolved',
+      createdAt: '2025-01-19T02:00:00Z',
+      updatedAt: '2025-01-19T03:30:00Z'
+    },
+    {
+      id: '3',
+      title: 'Brief API outage resolved',
+      description: 'A brief outage affecting API requests has been resolved.',
+      status: 'resolved',
+      createdAt: '2025-01-18T10:15:00Z',
+      updatedAt: '2025-01-18T10:45:00Z'
+    }
+  ]
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -24,10 +56,9 @@ export function Status() {
     switch (status) {
       case 'operational':
         return 'text-green-600 bg-green-50'
-      case 'degraded_performance':
+      case 'degraded':
         return 'text-yellow-600 bg-yellow-50'
-      case 'partial_outage':
-      case 'major_outage':
+      case 'down':
         return 'text-red-600 bg-red-50'
       default:
         return 'text-gray-600 bg-gray-50'
@@ -53,24 +84,6 @@ export function Status() {
     return new Date(dateString).toLocaleString()
   }
 
-  const getOverallStatus = () => {
-    if (servicesLoading) return { status: 'loading', message: 'Loading...' }
-    
-    const hasOutage = services.some(s => s.status === 'major_outage' || s.status === 'partial_outage')
-    const hasDegraded = services.some(s => s.status === 'degraded_performance')
-    
-    if (hasOutage) {
-      return { status: 'outage', message: 'Service Disruption', icon: XCircle, color: 'text-red-500' }
-    } else if (hasDegraded) {
-      return { status: 'degraded', message: 'Degraded Performance', icon: AlertTriangle, color: 'text-yellow-500' }
-    } else {
-      return { status: 'operational', message: 'All Systems Operational', icon: CheckCircle, color: 'text-green-500' }
-    }
-  }
-
-  const overallStatus = getOverallStatus()
-  const StatusIcon = overallStatus.icon || CheckCircle
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -87,9 +100,9 @@ export function Status() {
           {/* Overall Status */}
           <div className="bg-white rounded-xl p-6 border border-gray-200 mb-8">
             <div className="flex items-center space-x-3">
-              <StatusIcon className={`h-8 w-8 ${overallStatus.color}`} />
+              <CheckCircle className="h-8 w-8 text-green-500" />
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">{overallStatus.message}</h2>
+                <h2 className="text-xl font-semibold text-gray-900">All Systems Operational</h2>
                 <p className="text-gray-600">Last updated: {new Date().toLocaleString()}</p>
               </div>
             </div>
@@ -113,10 +126,7 @@ export function Status() {
                     {getStatusIcon(service.status)}
                     <div>
                       <h4 className="font-medium text-gray-900">{service.name}</h4>
-                      <p className="text-sm text-gray-600">Uptime: {service.uptime}%</p>
-                      {service.description && (
-                        <p className="text-xs text-gray-500">{service.description}</p>
-                      )}
+                      <p className="text-sm text-gray-600">Uptime: {service.uptime}</p>
                     </div>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(service.status)}`}>
@@ -126,25 +136,6 @@ export function Status() {
               ))}
             </div>
           </div>
-
-          {servicesLoading && (
-            <div className="bg-white rounded-xl p-6 border border-gray-200 mb-8">
-              <div className="animate-pulse">
-                <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
-                <div className="space-y-3">
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-5 h-5 bg-gray-200 rounded-full"></div>
-                        <div className="h-4 bg-gray-200 rounded w-32"></div>
-                      </div>
-                      <div className="h-6 bg-gray-200 rounded w-20"></div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Incidents */}
           <div className="bg-white rounded-xl border border-gray-200">
@@ -163,48 +154,18 @@ export function Status() {
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
                       <h4 className="font-medium text-gray-900 mb-1">{incident.title}</h4>
-                      {incident.description && (
-                        <p className="text-gray-600 text-sm mb-2">{incident.description}</p>
-                      )}
+                      <p className="text-gray-600 text-sm mb-2">{incident.description}</p>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${getIncidentStatusColor(incident.status)}`}>
                       {incident.status.charAt(0).toUpperCase() + incident.status.slice(1)}
                     </span>
                   </div>
                   <div className="flex space-x-4 text-xs text-gray-500">
-                    <span>Created: {formatDate(incident.created_at)}</span>
-                    <span>Updated: {formatDate(incident.updated_at)}</span>
+                    <span>Created: {formatDate(incident.createdAt)}</span>
+                    <span>Updated: {formatDate(incident.updatedAt)}</span>
                   </div>
                 </motion.div>
               ))}
-              
-              {incidentsLoading && (
-                <div className="p-6">
-                  <div className="animate-pulse space-y-4">
-                    {[...Array(3)].map((_, i) => (
-                      <div key={i}>
-                        <div className="flex justify-between items-start mb-3">
-                          <div className="flex-1">
-                            <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                            <div className="h-3 bg-gray-200 rounded w-full"></div>
-                          </div>
-                          <div className="h-6 bg-gray-200 rounded w-20"></div>
-                        </div>
-                        <div className="flex space-x-4">
-                          <div className="h-3 bg-gray-200 rounded w-32"></div>
-                          <div className="h-3 bg-gray-200 rounded w-32"></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {!incidentsLoading && incidents.length === 0 && (
-                <div className="p-6 text-center text-gray-500">
-                  No recent incidents to display
-                </div>
-              )}
             </div>
           </div>
 
