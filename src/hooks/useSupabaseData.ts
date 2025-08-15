@@ -17,6 +17,17 @@ export interface UsageData {
   costThisMonth: number
   requestsThisMonth: number
   modelsUsed: string[]
+  billingHistory: BillingRecord[]
+}
+
+export interface BillingRecord {
+  id: string
+  date: string
+  amount: number
+  tokens_used: number
+  status: 'paid' | 'pending' | 'failed'
+  period_start: string
+  period_end: string
 }
 
 export interface Model {
@@ -43,7 +54,8 @@ export function useSupabaseData() {
     tokensThisMonth: 0,
     costThisMonth: 0,
     requestsThisMonth: 0,
-    modelsUsed: []
+    modelsUsed: [],
+    billingHistory: []
   })
   const [models, setModels] = useState<Model[]>([])
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -114,6 +126,45 @@ export function useSupabaseData() {
 
       if (error) throw error
 
+      // Fetch billing history (last 6 months of aggregated usage)
+      const sixMonthsAgo = new Date()
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+      
+      const { data: billingData, error: billingError } = await supabase
+        .from('usage_logs')
+        .select('cost, prompt_tokens, completion_tokens, created_at')
+        .eq('user_id', user.id)
+        .gte('created_at', sixMonthsAgo.toISOString())
+        .order('created_at', { ascending: false })
+
+      if (billingError) throw billingError
+
+      // Group billing data by month
+      const monthlyBilling: { [key: string]: BillingRecord } = {}
+      
+      billingData?.forEach(log => {
+        const date = new Date(log.created_at)
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+        
+        if (!monthlyBilling[monthKey]) {
+          const monthStart = new Date(date.getFullYear(), date.getMonth(), 1)
+          const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0)
+          
+          monthlyBilling[monthKey] = {
+            id: monthKey,
+            date: monthStart.toISOString().split('T')[0],
+            amount: 0,
+            tokens_used: 0,
+            status: 'paid' as const,
+            period_start: monthStart.toISOString(),
+            period_end: monthEnd.toISOString()
+          }
+        }
+        
+        monthlyBilling[monthKey].amount += parseFloat(log.cost.toString())
+        monthlyBilling[monthKey].tokens_used += log.prompt_tokens + log.completion_tokens
+      })
+
       if (usageLogs) {
         const totalTokens = usageLogs.reduce((sum, log) => 
           sum + log.prompt_tokens + log.completion_tokens, 0
@@ -129,7 +180,10 @@ export function useSupabaseData() {
           tokensThisMonth: totalTokens,
           costThisMonth: totalCost,
           requestsThisMonth: usageLogs.length,
-          modelsUsed: uniqueModels
+          modelsUsed: uniqueModels,
+          billingHistory: Object.values(monthlyBilling).sort((a, b) => 
+            new Date(b.date).getTime() - new Date(a.date).getTime()
+          )
         })
       }
     } catch (err) {

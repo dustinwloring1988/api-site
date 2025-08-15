@@ -324,7 +324,7 @@ export function Dashboard() {
                   <p className="text-gray-600">Manage your billing information and view usage</p>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 gap-6">
                   <div className="bg-white rounded-xl p-6 border border-gray-200">
                     <h4 className="text-lg font-medium text-gray-900 mb-4">Current Usage</h4>
                     <div className="space-y-4">
@@ -342,46 +342,111 @@ export function Dashboard() {
                           {formatNumber(Math.max(0, 1000000 - usageData.tokensThisMonth))} tokens
                         </span>
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-xl p-6 border border-gray-200">
-                    <h4 className="text-lg font-medium text-gray-900 mb-4">Payment Method</h4>
-                    <div className="space-y-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
-                          <CreditCard size={16} className="text-blue-600" />
+                      <div className="pt-4 border-t border-gray-200">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Account type</span>
+                          <span className="font-semibold">
+                            {usageData.tokensThisMonth > 1000000 ? 'Pay-as-you-go' : 'Free Tier'}
+                          </span>
                         </div>
-                        <div>
-                          <p className="font-medium">•••• •••• •••• 4242</p>
-                          <p className="text-sm text-gray-600">Expires 12/27</p>
-                        </div>
+                        {usageData.tokensThisMonth > 1000000 && (
+                          <div className="flex justify-between items-center mt-2">
+                            <span className="text-gray-600">Overage tokens</span>
+                            <span className="font-semibold text-orange-600">
+                              {formatNumber(usageData.tokensThisMonth - 1000000)} tokens
+                            </span>
+                          </div>
+                        )}
                       </div>
-                      <Button variant="outline" size="sm">Update Payment Method</Button>
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-white rounded-xl p-6 border border-gray-200">
                   <h4 className="text-lg font-medium text-gray-900 mb-4">Billing History</h4>
-                  <div className="space-y-3">
-                    {[
-                      { date: '2025-01-01', amount: 23.45, status: 'paid' },
-                      { date: '2024-12-01', amount: 18.92, status: 'paid' },
-                      { date: '2024-11-01', amount: 31.20, status: 'paid' },
-                    ].map((bill, index) => (
-                      <div key={index} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-                        <div>
-                          <p className="font-medium">{formatCurrency(bill.amount)}</p>
-                          <p className="text-sm text-gray-600">{bill.date}</p>
+                  {usageData.billingHistory.length === 0 ? (
+                    <div className="text-center py-8">
+                      <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <h4 className="text-lg font-medium text-gray-900 mb-2">No billing history</h4>
+                      <p className="text-gray-600">Your billing history will appear here once you start using the API.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {usageData.billingHistory.map((bill) => (
+                        <div key={bill.id} className="flex justify-between items-center py-3 border-b border-gray-100 last:border-b-0">
+                          <div>
+                            <p className="font-medium">{formatCurrency(bill.amount)}</p>
+                            <div className="text-sm text-gray-600">
+                              <p>{new Date(bill.date).toLocaleDateString('en-US', { 
+                                year: 'numeric', 
+                                month: 'long' 
+                              })}</p>
+                              <p>{formatNumber(bill.tokens_used)} tokens used</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                              bill.status === 'paid' 
+                                ? 'bg-green-100 text-green-800' 
+                                : bill.status === 'pending'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {bill.status.charAt(0).toUpperCase() + bill.status.slice(1)}
+                            </span>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {new Date(bill.period_start).toLocaleDateString()} - {new Date(bill.period_end).toLocaleDateString()}
+                            </p>
+                          </div>
                         </div>
-                        <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
-                          Paid
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
+
+                {/* Usage by Model */}
+                <div className="bg-white rounded-xl p-6 border border-gray-200">
+                  <h4 className="text-lg font-medium text-gray-900 mb-4">Usage by Model</h4>
+                  {usageData.modelsUsed.length === 0 ? (
+                    <div className="text-center py-4">
+                      <p className="text-gray-600">No models used this month</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {usageData.modelsUsed.map((model, index) => (
+                        <div key={model} className="flex justify-between items-center">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-3 h-3 rounded-full bg-blue-500" />
+                            <span className="font-medium">{model}</span>
+                          </div>
+                          <span className="text-sm text-gray-600">Active</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Free Tier Information */}
+                {usageData.tokensThisMonth <= 1000000 && (
+                  <div className="bg-blue-50 rounded-xl p-6 border border-blue-200">
+                    <h4 className="text-lg font-medium text-blue-900 mb-2">Free Tier</h4>
+                    <p className="text-blue-700 mb-4">
+                      You're currently on our free tier with 1M tokens per month. 
+                      {usageData.tokensThisMonth > 0 && (
+                        <span> You've used {((usageData.tokensThisMonth / 1000000) * 100).toFixed(1)}% of your free allocation.</span>
+                      )}
+                    </p>
+                    <div className="w-full bg-blue-200 rounded-full h-2 mb-4">
+                        <div>
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${Math.min((usageData.tokensThisMonth / 1000000) * 100, 100)}%` }}
+                        </div>
+                    </div>
+                    <p className="text-sm text-blue-600">
+                      {formatNumber(Math.max(0, 1000000 - usageData.tokensThisMonth))} tokens remaining this month
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
