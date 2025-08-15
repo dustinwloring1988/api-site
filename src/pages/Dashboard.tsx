@@ -437,10 +437,10 @@ export function Dashboard() {
                       )}
                     </p>
                     <div className="w-full bg-blue-200 rounded-full h-2 mb-4">
-                        <div>
+                        <div
                           className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                           style={{ width: `${Math.min((usageData.tokensThisMonth / 1000000) * 100, 100)}%` }}
-                        </div>
+                        />
                     </div>
                     <p className="text-sm text-blue-600">
                       {formatNumber(Math.max(0, 1000000 - usageData.tokensThisMonth))} tokens remaining this month
