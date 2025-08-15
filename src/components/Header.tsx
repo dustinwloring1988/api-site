@@ -35,7 +35,7 @@ export function Header() {
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex space-x-8">
-              {navigation.filter(item => item.show).map((item) => (
+              {!user && navigation.filter(item => item.show).map((item) => (
                 <Link
                   key={item.name}
                   to={item.href}
@@ -75,16 +75,24 @@ export function Header() {
                     <motion.div
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1"
+                      className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1"
                     >
-                      <Link
-                        to="/dashboard"
-                        className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        onClick={() => setIsProfileOpen(false)}
-                      >
-                        <Settings size={16} />
-                        <span>Dashboard</span>
-                      </Link>
+                      {navigation.filter(item => item.show).map((item) => (
+                        <Link
+                          key={item.name}
+                          to={item.href}
+                          className={`flex items-center space-x-2 px-4 py-2 text-sm transition-colors ${
+                            location.pathname === item.href
+                              ? 'text-blue-600 bg-blue-50'
+                              : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                          onClick={() => setIsProfileOpen(false)}
+                        >
+                          <Settings size={16} />
+                          <span>{item.name}</span>
+                        </Link>
+                      ))}
+                      <div className="border-t border-gray-200 my-1" />
                       <button
                         onClick={() => {
                           signOut()
@@ -127,16 +135,45 @@ export function Header() {
               exit={{ opacity: 0, height: 0 }}
               className="md:hidden border-t border-gray-200 py-4 space-y-4"
             >
-              {navigation.filter(item => item.show).map((item) => (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className="block px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  {item.name}
-                </Link>
-              ))}
+              {!user ? (
+                navigation.filter(item => item.show).map((item) => (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    className="block px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    {item.name}
+                  </Link>
+                ))
+              ) : (
+                <>
+                  {navigation.filter(item => item.show).map((item) => (
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      className={`block px-4 py-2 text-sm font-medium transition-colors ${
+                        location.pathname === item.href
+                          ? 'text-blue-600'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      {item.name}
+                    </Link>
+                  ))}
+                  <div className="border-t border-gray-200 mx-4" />
+                  <button
+                    onClick={() => {
+                      signOut()
+                      setIsMobileMenuOpen(false)
+                    }}
+                    className="block w-full text-left px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900"
+                  >
+                    Sign Out
+                  </button>
+                </>
+              )}
               
               {!user && (
                 <div className="space-y-2 px-4">
